@@ -1,5 +1,7 @@
 There are two scripts here: `movies-maintenance`, and `tv-maintenance`. I wrote them to help ensure my collection of TV shows and movies collections organized.  The scripts are intended to be interactive; so they're not really well-suited for use as a _cron_ job.  I only run them after I have ripped a new disc into the collection, as at no other time should the files change.
 
+They are written in Ruby, and I use them on MRI 1.9.2. YMMV if you use them on a different version.
+
 # Movies
 
 This script aims to organize your film collection using the following format:
