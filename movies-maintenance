@@ -1,0 +1,77 @@
+#!/usr/bin/env ruby
+
+puts "Looking for movies..."
+
+Dir.chdir("/mnt/media/video/movies/by-name")
+
+filenames = Dir.glob('*.*')
+
+filenames = filenames.group_by {|filename| /^(.+)\..+$/.match(filename)[1] }
+
+puts "Found #{filenames.length} files representing #{filenames.length} unique titles.\n"
+
+filenames.each_pair do |name,files|
+  # ensure that the filename has a year
+  new_name = name
+  puts "'#{name}'"
+  unless /^.+ \[\d+\]$/.match(name) then
+    print "  No year given. Enter a year [yyyy] to add it, enter nothing to skip, or enter '!q' to quit: "
+    answer = gets.strip
+    case answer
+    when '!q'
+      exit
+    when /\d{4}/
+      new_name = "#{name} [#{answer}]"
+    end   
+  end
+  
+  if name != new_name then
+    print "  Renaming files...."
+    files.each do |f|
+      ext = /^(.+)\.(\w+)$/.match(f)[2]
+      new_f = "#{new_name}.#{ext}"
+      if File.exists?(new_f) then
+        new_f = new_f + ".copy"
+      end
+      File.rename(f, new_f)
+      print "#{f} => #{new_f}..."
+    end
+    print "saved!\n"
+  end
+end
+
+puts "Removing all symlinks in by-date folder"
+Dir.chdir("../by-date/") do
+  Dir.entries(".").each do |entry|
+    if File.symlink?(entry) then
+      puts "deleting ./by-date/#{entry}"
+      File.delete(entry)
+    end
+  end
+end
+
+puts "Rescanning for movies..."
+
+filenames = Dir.glob('*.{avi,mpg,mkv,m4v,mp4}')
+
+print "Found #{filenames.length} files "
+
+filenames = filenames.group_by {|filename| /^(.+)\..+$/.match(filename)[1] }
+
+print "representing #{filenames.length} unique titles.\n\n"
+
+Dir.chdir("../by-date") do
+  filenames.each_pair do |name,files|
+    # find the file representing the actual video
+    # files should be contain only one filename, so just grab the first one
+    file = files.first
+    print "  #{name} "
+    # Ensure there is a link to the movie in the by-year folder (assuming the movie has a year)
+    if /^(.+) \[(\d+)\]\.(\w+)$/.match(file) then
+      print "<- ../by-date/#{$2}_#{$1}.#{$3}\n"
+      File.symlink("../by-name/#{file}","#{$2}_#{$1}.#{$3}")
+    else
+      print "- skip.\n"
+    end
+  end
+end

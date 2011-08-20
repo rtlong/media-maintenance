@@ -1,0 +1,96 @@
+#!/usr/bin/env ruby
+
+def clean_title(title)
+  title.strip.
+        squeeze(' ').
+        gsub(': ', ' - ').     # replace 'Star Wars IV: Return of the Jedi' with '...IV - Return...'
+        delete('?*\|').        # delete these chars
+        tr('<^>":', '_').      # replace these with underscore: <^>":
+        gsub(/\s+/,' ').       # squish multiple spaces together
+        squeeze('_').          # squish multiple underscores
+        gsub(/^[^A-Za-z0-9'$(\[]+/, '').  # Remove extra crap from the start
+        gsub(/[^A-Za-z0-9'.$!)\]]+$/, '') # Remove extra crap from the end
+end
+
+puts "Looking for episodes..."
+
+Dir.chdir("/mnt/media/video/television/")
+
+filenames = Dir.glob('*/s*/*.*')
+filenames = filenames.group_by {|filename| /([^\/]+)\..+?$/.match(filename)[1] }
+
+puts "Found #{filenames.length} files representing #{filenames.length} unique titles.\n"
+
+max_name_length = filenames.keys.collect(&:length).max
+
+filenames.each_pair do |name, files|
+  # show which name we're looking at
+  print "\r'#{name}'".ljust(max_name_length+3)
+  
+  if m = /^([A-Za-z ]+)_(\d+)x(\d+)(?:_(.+)|.*)$/.match(name) then
+    # grab the constituent parts and save them
+    @show, @season, @episode, @title = m[1..4]
+    @id = "#{@season}x#{@episode}"
+    
+    if @title then # clean up curent title
+      new_title = clean_title( @title )
+    end
+    # if @title is not set or if (it is) but new_title is empty after cleaning, ask for title
+    if @title.nil? || new_title.empty? then
+      print "\n" # a newline to prepare for more output
+      newline_printed = true
+      puts "  No title given for this episode. The files found are:"
+      files.each do |f|
+        puts "    * #{f}"
+      end
+      puts "  Enter this episode's title to rename the files, '' to skip this episode, or '!q' to quit:"
+      print "  > "
+      answer_acceptable = nil
+      until answer_acceptable do
+        if answer_acceptable == false then
+          puts  "  Can't use a name with a '/' and I don't know how to automatically convert that."
+          print "  Try Again: "
+        end
+        # accept the response, clean it
+        answer = gets.strip.squeeze(' ')
+        
+        exit if answer == "!q"
+        
+        # we can't know what the user meant with a '/' in their answer, thus we can't auto-replace it
+        answer_acceptable = ! answer.include?('/') 
+      end
+      new_title = clean_title( answer )
+    end
+    # new_title will have been set by this point
+    
+    # rename the files, but only if new_title is set and is different than the original title
+    if ( not new_title.empty? ) && new_title != @title then
+      print "\n" unless newline_printed # a newline to prepare for more output
+      puts "  Renaming files..."
+      files.each do |f|
+        ext = File.extname(f).delete('.')
+        dir = File.dirname(f)
+        dup_counter = nil
+        
+        new_name = [@show, @id, new_title].join("_")
+        
+        # use a .0, .1, .2 ... suffix when there are naming conflicts
+        while File.exists?(new_f = File.join(dir, [new_name, dup_counter, ext].compact.join(".") ))
+          dup = dup.nil? ? 0 : (dup + 1)
+        end
+        
+        puts "    #{f} => #{new_f}"
+        File.rename(f, new_f)
+      end
+    end  
+    
+  else
+    puts "\n  Skipping - doesn't look like an episode, if it is, rename it like 'Show Title_3x12...'"
+    puts "  The files for this group are:"
+    files.each do |f|
+      puts "    * #{f}"
+    end
+  end  
+
+end
+print "\r".ljust(max_name_length+3) + "\n"
